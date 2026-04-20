@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -23,17 +24,30 @@ public class SimpleTurnManager : MonoBehaviour
     private int movementsRemaining = 0;
     private bool waitingForDice = true;
     private bool waitingForCard = false;
+    private bool blockNextTurnMovements = false;
+    private bool gameLocked = false;
+
+    public event Action<int> OnTurnStarted;
+    public event Action<int> OnDiceRolled;
+    public event Action<string, int> OnMovementSpent;
+    public event Action OnMovementPhaseEnded;
+    public event Action<string> OnCardChosen;
+    public event Action<int> OnTurnEnded;
+
+    public int CurrentTurn => currentTurn;
+    public int MovementsRemaining => movementsRemaining;
 
     private void Start()
     {
         UpdateUI();
         UpdateButtons();
         Debug.Log($"Inicia turno {currentTurn}");
+        OnTurnStarted?.Invoke(currentTurn);
     }
 
     private void Update()
     {
-        if (waitingForDice || waitingForCard || movementsRemaining <= 0)
+        if (gameLocked || waitingForDice || waitingForCard || movementsRemaining <= 0)
         {
             return;
         }
@@ -58,12 +72,30 @@ public class SimpleTurnManager : MonoBehaviour
 
     public void RollDice()
     {
-        if (!waitingForDice)
+        if (gameLocked || !waitingForDice)
         {
             return;
         }
 
-        int diceResult = Random.Range(1, 7);
+        if (blockNextTurnMovements)
+        {
+            blockNextTurnMovements = false;
+            movementsRemaining = 0;
+            waitingForDice = false;
+            waitingForCard = true;
+
+            Debug.Log("Turno bloqueado por Stop. No puedes gastar movimientos en este turno.");
+            Debug.Log("Dado lanzado: 0");
+
+            UpdateUI();
+            UpdateButtons();
+
+            OnDiceRolled?.Invoke(0);
+            OnMovementPhaseEnded?.Invoke();
+            return;
+        }
+
+        int diceResult = UnityEngine.Random.Range(1, 7);
         movementsRemaining = diceResult;
         waitingForDice = false;
         waitingForCard = false;
@@ -72,21 +104,29 @@ public class SimpleTurnManager : MonoBehaviour
 
         UpdateUI();
         UpdateButtons();
+
+        OnDiceRolled?.Invoke(diceResult);
     }
 
     public void ChooseCard()
     {
-        if (!waitingForCard)
+        if (gameLocked || !waitingForCard)
         {
             return;
         }
 
-        string card = availableCards[Random.Range(0, availableCards.Count)];
-        playerCards.Add(card);
+        string card = availableCards[UnityEngine.Random.Range(0, availableCards.Count)];
+        if (IsNumericCard(card))
+        {
+            playerCards.Add(card);
+        }
 
         Debug.Log($"Carta obtenida: {card}");
         Debug.Log($"Cartas del jugador: {string.Join(", ", playerCards)}");
+        OnCardChosen?.Invoke(card);
+
         Debug.Log("Turno terminado");
+        OnTurnEnded?.Invoke(currentTurn);
 
         currentTurn++;
         movementsRemaining = 0;
@@ -97,6 +137,7 @@ public class SimpleTurnManager : MonoBehaviour
         UpdateButtons();
 
         Debug.Log($"Inicia turno {currentTurn}");
+        OnTurnStarted?.Invoke(currentTurn);
     }
 
     private void ConsumeMovement(string key)
@@ -110,6 +151,7 @@ public class SimpleTurnManager : MonoBehaviour
 
         Debug.Log($"Tecla {key} presionada");
         Debug.Log($"Movimientos restantes: {movementsRemaining}");
+        OnMovementSpent?.Invoke(key, movementsRemaining);
 
         UpdateUI();
 
@@ -118,7 +160,19 @@ public class SimpleTurnManager : MonoBehaviour
             waitingForCard = true;
             UpdateButtons();
             Debug.Log("Ya no quedan movimientos. Puedes elegir una carta.");
+            OnMovementPhaseEnded?.Invoke();
         }
+    }
+
+    public void SetGameLocked(bool value)
+    {
+        gameLocked = value;
+        UpdateButtons();
+    }
+
+    public void BlockNextTurnMovements()
+    {
+        blockNextTurnMovements = true;
     }
 
     private void UpdateUI()
@@ -138,12 +192,18 @@ public class SimpleTurnManager : MonoBehaviour
     {
         if (rollDiceButton != null)
         {
-            rollDiceButton.interactable = waitingForDice;
+            rollDiceButton.interactable = waitingForDice && !gameLocked;
         }
 
         if (chooseCardButton != null)
         {
-            chooseCardButton.interactable = waitingForCard;
+            chooseCardButton.interactable = waitingForCard && !gameLocked;
         }
+    }
+
+    private bool IsNumericCard(string card)
+    {
+        int number;
+        return int.TryParse(card, out number);
     }
 }
