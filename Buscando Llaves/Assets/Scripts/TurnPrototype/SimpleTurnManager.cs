@@ -12,6 +12,9 @@ public class SimpleTurnManager : MonoBehaviour
     [SerializeField] private TMP_Text turnText;
     [SerializeField] private TMP_Text movementsText;
 
+    [Header("Input")]
+    [SerializeField] private bool useExternalMovementInput = false;
+
     private readonly List<string> availableCards = new List<string>
     {
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
@@ -39,6 +42,7 @@ public class SimpleTurnManager : MonoBehaviour
 
     private void Start()
     {
+        AutoConfigureMovementInput();
         UpdateUI();
         UpdateButtons();
         Debug.Log($"Inicia turno {currentTurn}");
@@ -47,26 +51,26 @@ public class SimpleTurnManager : MonoBehaviour
 
     private void Update()
     {
-        if (gameLocked || waitingForDice || waitingForCard || movementsRemaining <= 0)
+        if (useExternalMovementInput || gameLocked || waitingForDice || waitingForCard || movementsRemaining <= 0)
         {
             return;
         }
 
         if (Input.GetKeyDown(KeyCode.W))
         {
-            ConsumeMovement("W");
+            TryConsumeMovement("W");
         }
         else if (Input.GetKeyDown(KeyCode.A))
         {
-            ConsumeMovement("A");
+            TryConsumeMovement("A");
         }
         else if (Input.GetKeyDown(KeyCode.S))
         {
-            ConsumeMovement("S");
+            TryConsumeMovement("S");
         }
         else if (Input.GetKeyDown(KeyCode.D))
         {
-            ConsumeMovement("D");
+            TryConsumeMovement("D");
         }
     }
 
@@ -140,11 +144,34 @@ public class SimpleTurnManager : MonoBehaviour
         OnTurnStarted?.Invoke(currentTurn);
     }
 
-    private void ConsumeMovement(string key)
+    public bool TryConsumeMovement(string key)
     {
-        if (movementsRemaining <= 0)
+        return TryConsumeMovementInternal(key, true);
+    }
+
+    public bool TryConsumeMovementExternal(string key)
+    {
+        return TryConsumeMovementInternal(key, false);
+    }
+
+    public void CompleteExternalMovementStep()
+    {
+        if (gameLocked || waitingForDice || waitingForCard)
         {
             return;
+        }
+
+        if (movementsRemaining == 0)
+        {
+            FinishMovementPhase();
+        }
+    }
+
+    private bool TryConsumeMovementInternal(string key, bool finishPhaseImmediately)
+    {
+        if (gameLocked || waitingForDice || waitingForCard || movementsRemaining <= 0)
+        {
+            return false;
         }
 
         movementsRemaining--;
@@ -155,13 +182,20 @@ public class SimpleTurnManager : MonoBehaviour
 
         UpdateUI();
 
-        if (movementsRemaining == 0)
+        if (movementsRemaining == 0 && finishPhaseImmediately)
         {
-            waitingForCard = true;
-            UpdateButtons();
-            Debug.Log("Ya no quedan movimientos. Puedes elegir una carta.");
-            OnMovementPhaseEnded?.Invoke();
+            FinishMovementPhase();
         }
+
+        return true;
+    }
+
+    private void FinishMovementPhase()
+    {
+        waitingForCard = true;
+        UpdateButtons();
+        Debug.Log("Ya no quedan movimientos. Puedes elegir una carta.");
+        OnMovementPhaseEnded?.Invoke();
     }
 
     public void SetGameLocked(bool value)
@@ -173,6 +207,19 @@ public class SimpleTurnManager : MonoBehaviour
     public void BlockNextTurnMovements()
     {
         blockNextTurnMovements = true;
+    }
+
+    public void SetUseExternalMovementInput(bool value)
+    {
+        useExternalMovementInput = value;
+    }
+
+    private void AutoConfigureMovementInput()
+    {
+        if (FindObjectOfType<SimpleGridTurnMovement>() != null)
+        {
+            useExternalMovementInput = true;
+        }
     }
 
     private void UpdateUI()

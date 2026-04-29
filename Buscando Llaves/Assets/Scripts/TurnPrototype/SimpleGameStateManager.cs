@@ -4,31 +4,12 @@ using UnityEngine;
 
 public class SimpleGameStateManager : MonoBehaviour
 {
-    public enum TileType
-    {
-        Empty,
-        Chest,
-        TrapRayo,
-        HiddenKey
-    }
-
-    public enum ChestType
-    {
-        Blue,
-        Orange,
-        Pink
-    }
-
-    [System.Serializable]
-    public class TileEntry
-    {
-        public TileType tileType = TileType.Empty;
-        public ChestType chestType = ChestType.Blue;
-        [Range(0f, 1f)] public float keyChance = 0.5f;
-    }
+    public event System.Action<bool, string> OnGameEnded;
 
     [Header("References")]
     [SerializeField] private SimpleTurnManager turnManager;
+    [SerializeField] private SimpleGridMapGenerator mapGenerator;
+    [SerializeField] private SimpleGridTurnMovement gridMovement;
 
     [Header("UI")]
     [SerializeField] private TMP_Text diceResultText;
@@ -43,17 +24,34 @@ public class SimpleGameStateManager : MonoBehaviour
     [SerializeField] private int keysToWin = 2;
     [SerializeField] private int maxTurns = 18;
 
-    [Header("Tile Test Sequence")]
-    [SerializeField] private List<TileEntry> testTiles = new List<TileEntry>();
+    [Header("Fallback Tile Codes")]
+    [SerializeField] private List<int> fallbackTileCodes = new List<int> { 6, 2, 3, 7, 1, 6, 4, 8, 6, 5, 9 };
 
     private readonly List<int> numericHand = new List<int>();
 
     private int currentLives;
     private int keysFound;
-    private int currentTileIndex;
+    private int fallbackTileIndex;
     private bool gameEnded;
+    private bool movementSpentThisTurn;
 
- 
+    private void Awake()
+    {
+        if (turnManager == null)
+        {
+            turnManager = GetComponent<SimpleTurnManager>();
+        }
+
+        if (mapGenerator == null)
+        {
+            mapGenerator = FindObjectOfType<SimpleGridMapGenerator>();
+        }
+
+        if (gridMovement == null)
+        {
+            gridMovement = FindObjectOfType<SimpleGridTurnMovement>();
+        }
+    }
 
     private void OnEnable()
     {
@@ -65,6 +63,7 @@ public class SimpleGameStateManager : MonoBehaviour
         turnManager.OnTurnStarted += HandleTurnStarted;
         turnManager.OnDiceRolled += HandleDiceRolled;
         turnManager.OnCardChosen += HandleCardChosen;
+        turnManager.OnMovementSpent += HandleMovementSpent;
         turnManager.OnMovementPhaseEnded += HandleMovementPhaseEnded;
     }
 
@@ -78,6 +77,7 @@ public class SimpleGameStateManager : MonoBehaviour
         turnManager.OnTurnStarted -= HandleTurnStarted;
         turnManager.OnDiceRolled -= HandleDiceRolled;
         turnManager.OnCardChosen -= HandleCardChosen;
+        turnManager.OnMovementSpent -= HandleMovementSpent;
         turnManager.OnMovementPhaseEnded -= HandleMovementPhaseEnded;
     }
 
@@ -90,8 +90,9 @@ public class SimpleGameStateManager : MonoBehaviour
     {
         currentLives = initialLives;
         keysFound = 0;
-        currentTileIndex = 0;
+        fallbackTileIndex = 0;
         gameEnded = false;
+        movementSpentThisTurn = false;
         numericHand.Clear();
 
         UpdateLivesUI();
@@ -112,11 +113,12 @@ public class SimpleGameStateManager : MonoBehaviour
             return;
         }
 
+        movementSpentThisTurn = false;
         UpdateTurnLimitUI(turnNumber);
 
         if (turnNumber > maxTurns && keysFound < keysToWin)
         {
-            EndGame(false, "Derrota: se alcanzo el limite de turnos sin conseguir todas las llaves.");
+            EndGame("Derrota: se alcanzo el limite de turnos sin conseguir todas las llaves.");
             return;
         }
 
@@ -160,6 +162,16 @@ public class SimpleGameStateManager : MonoBehaviour
         ApplySpecialCard(card);
     }
 
+    private void HandleMovementSpent(string key, int remaining)
+    {
+        if (gameEnded)
+        {
+            return;
+        }
+
+        movementSpentThisTurn = true;
+    }
+
     private void HandleMovementPhaseEnded()
     {
         if (gameEnded)
@@ -167,95 +179,135 @@ public class SimpleGameStateManager : MonoBehaviour
             return;
         }
 
-        ResolveCurrentTile();
-    }
-
-    private void ApplySpecialCard(string card)
-    {
-        switch (card)
+        if (!movementSpentThisTurn)
         {
-            case "Tristeza":
-                ChangeLives(-1, "Carta Tristeza: pierdes 1 vida.");
-                break;
-
-            case "Retorno":
-                SetStatus("Carta Retorno: efecto registrado. El retroceso queda pendiente hasta integrar movimiento real.");
-                break;
-
-            case "Stop":
-                if (turnManager != null)
-                {
-                    turnManager.BlockNextTurnMovements();
-                }
-                SetStatus("Carta Stop: en el siguiente turno no podras gastar movimientos.");
-                break;
-
-            default:
-                SetStatus($"Carta especial no reconocida: {card}");
-                break;
-        }
-    }
-
-    private void ResolveCurrentTile()
-    {
-        if (testTiles == null || testTiles.Count == 0)
-        {
-            SetStatus("No hay casillas de prueba configuradas. Se toma casilla vacia.", false);
+            SetStatus("Turno sin desplazamiento. No se resolvio casilla.", false);
             return;
         }
 
-        TileEntry tile = testTiles[currentTileIndex];
-        int tileNumber = currentTileIndex + 1;
-
-        switch (tile.tileType)
+        if (mapGenerator != null && gridMovement != null)
         {
-            case TileType.Empty:
-                SetStatus($"Casilla {tileNumber}: vacia.");
-                break;
-
-            case TileType.TrapRayo:
-                ChangeLives(-1, $"Casilla {tileNumber}: trampa Rayo. Pierdes 1 vida.");
-                break;
-
-            case TileType.HiddenKey:
-                AddKey($"Casilla {tileNumber}: encontraste una llave oculta.");
-                break;
-
-            case TileType.Chest:
-                ResolveChest(tileNumber, tile.chestType, tile.keyChance);
-                break;
+            Vector2Int gridPosition = gridMovement.CurrentGridPosition;
+            int mapCode = mapGenerator.GetTileCode(gridPosition);
+            ResolveTileFromCode(mapCode, gridPosition, true);
+            return;
         }
 
-        currentTileIndex = (currentTileIndex + 1) % testTiles.Count;
+        ResolveFallbackTile();
     }
 
-    private void ResolveChest(int tileNumber, ChestType chestType, float keyChance)
+    private void ResolveFallbackTile()
     {
-        int cost = GetChestCost(chestType);
+        if (fallbackTileCodes == null || fallbackTileCodes.Count == 0)
+        {
+            SetStatus("No hay mapa ni lista fallback de casillas.", false);
+            return;
+        }
 
+        int code = fallbackTileCodes[fallbackTileIndex];
+        Vector2Int fallbackPosition = new Vector2Int(fallbackTileIndex, 0);
+        ResolveTileFromCode(code, fallbackPosition, false);
+        fallbackTileIndex = (fallbackTileIndex + 1) % fallbackTileCodes.Count;
+    }
+
+    private void ResolveTileFromCode(int code, Vector2Int gridPosition, bool fromMap)
+    {
+        switch (code)
+        {
+            case 0:
+                SetStatus($"Casilla ({gridPosition.x},{gridPosition.y}) sin tile.");
+                break;
+
+            case 1:
+                AddKey($"Casilla ({gridPosition.x},{gridPosition.y}): llave encontrada.");
+                if (fromMap && mapGenerator != null)
+                {
+                    mapGenerator.SetTileCode(gridPosition, 6);
+                }
+                break;
+
+            case 2:
+                ChangeLives(-1, $"Casilla ({gridPosition.x},{gridPosition.y}): trampa Rayo. Pierdes 1 vida.");
+                break;
+
+            case 3:
+                ResolveChestWithoutKey(gridPosition, "Azul", 10, fromMap);
+                break;
+
+            case 4:
+                ResolveChestWithoutKey(gridPosition, "Naranja", 15, fromMap);
+                break;
+
+            case 5:
+                ResolveChestWithoutKey(gridPosition, "Rosa", 20, fromMap);
+                break;
+
+            case 7:
+                ResolveChestWithKey(gridPosition, "Azul con llave", 10, fromMap);
+                break;
+
+            case 8:
+                ResolveChestWithKey(gridPosition, "Naranja con llave", 15, fromMap);
+                break;
+
+            case 9:
+                ResolveChestWithKey(gridPosition, "Rosa con llave", 20, fromMap);
+                break;
+
+            case 6:
+                SetStatus($"Casilla ({gridPosition.x},{gridPosition.y}): vacia.");
+                break;
+
+            default:
+                SetStatus($"Casilla ({gridPosition.x},{gridPosition.y}) con codigo desconocido: {code}.");
+                break;
+        }
+    }
+
+    private bool TryOpenChest(Vector2Int gridPosition, string chestName, int cost, bool fromMap)
+    {
         List<int> usedCards;
         int usedTotal;
         if (!TryConsumeNumericCards(cost, out usedCards, out usedTotal))
         {
             int availableTotal = GetHandTotal();
-            SetStatus($"Casilla {tileNumber}: cofre {ChestName(chestType)} (costo {cost}) no se puede abrir. Total disponible: {availableTotal}.");
-            return;
+            SetStatus($"Cofre {chestName} en ({gridPosition.x},{gridPosition.y}) costo {cost}. No alcanza. Total disponible: {availableTotal}.");
+            return false;
         }
 
         UpdateHandUI();
 
         string cardsText = usedCards.Count > 0 ? string.Join(", ", usedCards) : "ninguna";
-        SetStatus($"Casilla {tileNumber}: cofre {ChestName(chestType)} abierto usando cartas {cardsText} (total {usedTotal}).");
+        SetStatus($"Cofre {chestName} abierto en ({gridPosition.x},{gridPosition.y}) usando {cardsText} (total {usedTotal}).");
 
-        bool containsKey = Random.value <= keyChance;
-        if (containsKey)
+        if (fromMap && mapGenerator != null)
         {
-            AddKey($"El cofre {ChestName(chestType)} contenia una llave.");
+            mapGenerator.SetTileCode(gridPosition, 6);
         }
-        else
+
+        return true;
+    }
+
+    private void ResolveChestWithoutKey(Vector2Int gridPosition, string chestName, int cost, bool fromMap)
+    {
+        bool wasOpened = TryOpenChest(gridPosition, chestName, cost, fromMap);
+        if (!wasOpened)
         {
-            SetStatus($"El cofre {ChestName(chestType)} no contenia llave.");
+            return;
         }
+
+        SetStatus($"El cofre {chestName} no contenia llave.");
+    }
+
+    private void ResolveChestWithKey(Vector2Int gridPosition, string chestName, int cost, bool fromMap)
+    {
+        bool wasOpened = TryOpenChest(gridPosition, chestName, cost, fromMap);
+        if (!wasOpened)
+        {
+            return;
+        }
+
+        AddKey($"El cofre {chestName} contenia una llave.");
     }
 
     private bool TryConsumeNumericCards(int cost, out List<int> usedCards, out int usedTotal)
@@ -298,33 +350,29 @@ public class SimpleGameStateManager : MonoBehaviour
         return true;
     }
 
-    private int GetChestCost(ChestType chestType)
+    private void ApplySpecialCard(string card)
     {
-        switch (chestType)
+        switch (card)
         {
-            case ChestType.Blue:
-                return 10;
-            case ChestType.Orange:
-                return 15;
-            case ChestType.Pink:
-                return 20;
-            default:
-                return 10;
-        }
-    }
+            case "Tristeza":
+                ChangeLives(-1, "Carta rara Tristeza: pierdes 1 vida.");
+                break;
 
-    private string ChestName(ChestType chestType)
-    {
-        switch (chestType)
-        {
-            case ChestType.Blue:
-                return "Azul";
-            case ChestType.Orange:
-                return "Naranja";
-            case ChestType.Pink:
-                return "Rosa";
+            case "Retorno":
+                SetStatus("Carta rara Retorno: efecto registrado. El retroceso queda pendiente para una version avanzada.");
+                break;
+
+            case "Stop":
+                if (turnManager != null)
+                {
+                    turnManager.BlockNextTurnMovements();
+                }
+                SetStatus("Carta rara Stop: en el siguiente turno no podras gastar movimientos.");
+                break;
+
             default:
-                return "Desconocido";
+                SetStatus($"Carta rara no reconocida: {card}");
+                break;
         }
     }
 
@@ -347,7 +395,7 @@ public class SimpleGameStateManager : MonoBehaviour
 
         if (keysFound >= keysToWin)
         {
-            EndGame(true, "Victoria: conseguiste todas las llaves.");
+            EndGame("Victoria: conseguiste todas las llaves.");
         }
     }
 
@@ -364,11 +412,11 @@ public class SimpleGameStateManager : MonoBehaviour
 
         if (currentLives <= 0)
         {
-            EndGame(false, "Derrota: te quedaste sin vidas.");
+            EndGame("Derrota: te quedaste sin vidas.");
         }
     }
 
-    private void EndGame(bool isVictory, string message)
+    private void EndGame(string message)
     {
         if (gameEnded)
         {
@@ -376,19 +424,15 @@ public class SimpleGameStateManager : MonoBehaviour
         }
 
         gameEnded = true;
+        bool isVictory = keysFound >= keysToWin;
 
         if (turnManager != null)
         {
             turnManager.SetGameLocked(true);
         }
 
-        if (isVictory)
-        {
-            SetStatus(message);
-            return;
-        }
-
         SetStatus(message);
+        OnGameEnded?.Invoke(isVictory, message);
     }
 
     private void UpdateDiceResultUI(int value)
