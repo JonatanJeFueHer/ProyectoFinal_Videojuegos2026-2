@@ -50,8 +50,9 @@ public class SimpleGridMapGenerator : MonoBehaviour
     private readonly Dictionary<Vector2Int, int> tileCodes = new Dictionary<Vector2Int, int>();
     private readonly Dictionary<Vector2Int, Renderer> tileRenderers = new Dictionary<Vector2Int, Renderer>();
     private bool hasGenerated;
+    private Vector2Int startGridPosition = Vector2Int.zero;
 
-    public Vector2Int StartGridPosition => Vector2Int.zero;
+    public Vector2Int StartGridPosition => startGridPosition;
 
     private void Awake()
     {
@@ -77,8 +78,53 @@ public class SimpleGridMapGenerator : MonoBehaviour
     {
         ClearSpawnedTiles();
         ParseAndSpawnMap();
+        ResolveStartGridPosition();
         PlacePlayerAtStart();
         hasGenerated = true;
+    }
+
+    public void SetMatrixRows(List<string> rows, bool regenerate = true)
+    {
+        matrixRows = new List<string>(rows);
+        hasGenerated = false;
+
+        if (regenerate)
+        {
+            GenerateMap();
+        }
+    }
+
+    public List<string> GetMatrixRowsCopy()
+    {
+        return new List<string>(matrixRows);
+    }
+
+    public List<Vector2Int> GetPositionsByCode(int code)
+    {
+        List<Vector2Int> positions = new List<Vector2Int>();
+        foreach (KeyValuePair<Vector2Int, int> entry in tileCodes)
+        {
+            if (entry.Value == code)
+            {
+                positions.Add(entry.Key);
+            }
+        }
+
+        return positions;
+    }
+
+    public List<Vector2Int> GetWalkablePositions()
+    {
+        List<Vector2Int> positions = new List<Vector2Int>();
+        foreach (KeyValuePair<Vector2Int, int> entry in tileCodes)
+        {
+            if (entry.Value != (int)MapTileCode.NoTile)
+            {
+                positions.Add(entry.Key);
+            }
+        }
+
+        return positions;
     }
 
     [ContextMenu("Load Key Chest Test Map")]
@@ -155,7 +201,7 @@ public class SimpleGridMapGenerator : MonoBehaviour
 
         if (!IsWalkable(StartGridPosition))
         {
-            Debug.LogError("No se puede colocar el jugador en (0,0). Esa casilla no existe o es 0.");
+            Debug.LogError($"No se puede colocar el jugador en ({StartGridPosition.x},{StartGridPosition.y}). Esa casilla no existe o es 0.");
             return false;
         }
 
@@ -164,11 +210,16 @@ public class SimpleGridMapGenerator : MonoBehaviour
         return true;
     }
 
+    public Vector2Int GetFirstWalkablePosition()
+    {
+        return FindFirstWalkablePosition();
+    }
+
     private void ParseAndSpawnMap()
     {
         if (tilePrefab == null)
         {
-            Debug.LogWarning("SimpleGridMapGenerator: tilePrefab no asignado. Se usarq cubos temporales.");
+            Debug.LogWarning("SimpleGridMapGenerator: tilePrefab no asignado. Se usaran cubos temporales.");
         }
 
         for (int row = 0; row < matrixRows.Count; row++)
@@ -223,6 +274,101 @@ public class SimpleGridMapGenerator : MonoBehaviour
                 UpdateTileTint(gridPosition, code);
             }
         }
+    }
+
+    private void ResolveStartGridPosition()
+    {
+        if (IsWalkable(startGridPosition))
+        {
+            if (HasWalkableNeighbor(startGridPosition))
+            {
+                return;
+            }
+        }
+
+        Vector2Int connected = FindFirstConnectedWalkablePosition();
+        if (connected != Vector2Int.zero || IsWalkable(Vector2Int.zero))
+        {
+            startGridPosition = connected;
+            return;
+        }
+
+        startGridPosition = FindFirstWalkablePosition();
+    }
+
+    private Vector2Int FindFirstWalkablePosition()
+    {
+        int bestRow = int.MaxValue;
+        int bestCol = int.MaxValue;
+
+        foreach (KeyValuePair<Vector2Int, int> entry in tileCodes)
+        {
+            if (entry.Value == (int)MapTileCode.NoTile)
+            {
+                continue;
+            }
+
+            int col = entry.Key.x;
+            int row = entry.Key.y;
+
+            if (row < bestRow || (row == bestRow && col < bestCol))
+            {
+                bestRow = row;
+                bestCol = col;
+            }
+        }
+
+        if (bestRow == int.MaxValue)
+        {
+            return Vector2Int.zero;
+        }
+
+        return new Vector2Int(bestCol, bestRow);
+    }
+
+    private Vector2Int FindFirstConnectedWalkablePosition()
+    {
+        int bestRow = int.MaxValue;
+        int bestCol = int.MaxValue;
+        bool found = false;
+
+        foreach (KeyValuePair<Vector2Int, int> entry in tileCodes)
+        {
+            if (entry.Value == (int)MapTileCode.NoTile)
+            {
+                continue;
+            }
+
+            Vector2Int p = entry.Key;
+            if (!HasWalkableNeighbor(p))
+            {
+                continue;
+            }
+
+            int col = p.x;
+            int row = p.y;
+            if (row < bestRow || (row == bestRow && col < bestCol))
+            {
+                bestRow = row;
+                bestCol = col;
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            return Vector2Int.zero;
+        }
+
+        return new Vector2Int(bestCol, bestRow);
+    }
+
+    private bool HasWalkableNeighbor(Vector2Int p)
+    {
+        return IsWalkable(p + Vector2Int.up)
+            || IsWalkable(p + Vector2Int.down)
+            || IsWalkable(p + Vector2Int.left)
+            || IsWalkable(p + Vector2Int.right);
     }
 
     private void SpawnWall(Vector2Int gridPosition)

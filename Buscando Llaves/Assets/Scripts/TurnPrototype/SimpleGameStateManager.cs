@@ -5,6 +5,8 @@ using UnityEngine;
 public class SimpleGameStateManager : MonoBehaviour
 {
     public event System.Action<bool, string> OnGameEnded;
+    public event System.Action<int, int> OnLivesChanged;
+    public event System.Action<int, int> OnKeysChanged;
 
     [Header("References")]
     [SerializeField] private SimpleTurnManager turnManager;
@@ -34,6 +36,12 @@ public class SimpleGameStateManager : MonoBehaviour
     private int fallbackTileIndex;
     private bool gameEnded;
     private bool movementSpentThisTurn;
+
+    public int CurrentLives => currentLives;
+    public int InitialLives => initialLives;
+    public int KeysFound => keysFound;
+    public int KeysToWin => keysToWin;
+    public int MaxTurns => maxTurns;
 
     private void Awake()
     {
@@ -457,6 +465,8 @@ public class SimpleGameStateManager : MonoBehaviour
         {
             livesText.text = $"Vidas: {currentLives}";
         }
+
+        OnLivesChanged?.Invoke(currentLives, initialLives);
     }
 
     private void UpdateKeysUI()
@@ -465,6 +475,8 @@ public class SimpleGameStateManager : MonoBehaviour
         {
             keysText.text = $"Llaves: {keysFound}/{keysToWin}";
         }
+
+        OnKeysChanged?.Invoke(keysFound, keysToWin);
     }
 
     private void UpdateTurnLimitUI(int currentTurn)
