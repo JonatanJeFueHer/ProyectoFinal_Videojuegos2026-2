@@ -14,6 +14,11 @@ public class SimpleGridTurnMovement : MonoBehaviour
 
     public Vector2Int CurrentGridPosition => currentGridPosition;
 
+    public void ForceGridPosition(Vector2Int gridPosition)
+    {
+        currentGridPosition = gridPosition;
+    }
+
     private void Awake()
     {
         if (turnManager == null)
@@ -51,8 +56,9 @@ public class SimpleGridTurnMovement : MonoBehaviour
             mapGenerator.GenerateMap();
             mapGenerator.PlacePlayerAtStart();
 
+            currentGridPosition = mapGenerator.StartGridPosition;
             Vector3 startPosition;
-            if (mapGenerator.TryGetWorldPosition(Vector2Int.zero, out startPosition))
+            if (mapGenerator.TryGetWorldPosition(currentGridPosition, out startPosition))
             {
                 playerTransform.position = startPosition + Vector3.up * playerHeightOffset;
             }
