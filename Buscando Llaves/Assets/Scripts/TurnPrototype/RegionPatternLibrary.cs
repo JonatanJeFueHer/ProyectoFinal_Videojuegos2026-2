@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -7,104 +6,246 @@ public class RegionPatternLibrary : MonoBehaviour
     [Header("Tile Codes")]
     [SerializeField] private int wallCode = 0;
     [SerializeField] private int floorCode = 6;
+    [SerializeField] private int targetRegionSize = 10;
 
-    [Header("Corner Patterns (5x5, base orientation = top-left corner)")]
+    [Header("Wall/Corner Patterns (10x10, base = top-left corner)")]
     [SerializeField] private List<string[]> cornerPatternsCsv = new List<string[]>
     {
         new[]
         {
-            "0,0,0,0,0",
-            "0,6,6,6,0",
-            "0,6,6,6,0",
-            "0,6,6,6,0",
-            "0,0,0,6,0"
+            "0,0,0,0,0,0,0,0,0,0",
+            "0,6,6,6,0,0,0,0,0,0",
+            "0,6,0,6,0,6,6,6,0,0",
+            "0,6,0,6,0,6,0,6,0,0",
+            "0,6,0,6,6,6,0,6,6,6",
+            "0,6,0,0,0,6,0,0,6,6",
+            "0,6,6,6,0,6,6,6,6,0",
+            "0,0,0,6,0,0,0,0,6,0",
+            "0,6,6,6,6,6,6,0,6,0",
+            "0,0,0,0,6,6,0,0,0,0"
         },
         new[]
         {
-            "0,0,0,0,0",
-            "0,6,6,6,0",
-            "0,6,0,6,0",
-            "0,6,0,6,0",
-            "0,0,0,6,0"
+            "0,0,0,0,0,0,0,0,0,0",
+            "0,6,6,0,0,0,0,0,0,0",
+            "0,0,6,0,6,6,6,6,0,0",
+            "0,0,6,0,6,0,0,6,0,0",
+            "0,6,6,6,6,0,6,6,6,6",
+            "0,6,0,0,6,0,6,0,6,6",
+            "0,6,6,0,6,6,6,0,6,0",
+            "0,0,6,0,0,0,6,0,6,0",
+            "0,6,6,6,6,6,6,0,6,0",
+            "0,0,0,0,6,6,0,0,0,0"
         },
         new[]
         {
-            "0,0,0,0,0",
-            "0,6,6,6,0",
-            "0,6,0,6,0",
-            "0,0,0,6,0",
-            "0,6,6,6,0"
+            "0,0,0,0,0,0,0,0,0,0",
+            "0,6,6,6,6,0,0,0,0,0",
+            "0,6,0,0,6,0,6,6,6,0",
+            "0,6,6,0,6,0,6,0,6,0",
+            "0,0,6,0,6,6,6,0,6,6",
+            "0,0,6,0,0,0,6,0,6,6",
+            "0,6,6,6,6,0,6,6,6,0",
+            "0,6,0,0,6,0,0,0,6,0",
+            "0,6,6,6,6,6,6,6,6,0",
+            "0,0,0,0,6,6,0,0,0,0"
         },
         new[]
         {
-            "0,0,0,0,0",
-            "0,6,6,0,6",
-            "0,6,6,0,6",
-            "0,6,0,0,6",
-            "0,6,6,6,6"
+            "0,0,0,0,0,0,0,0,0,0",
+            "0,6,0,6,6,0,0,0,0,0",
+            "0,6,0,6,0,6,6,6,0,0",
+            "0,6,6,6,0,6,0,6,0,0",
+            "0,0,0,6,6,6,0,6,6,6",
+            "0,6,6,6,0,0,0,6,6,6",
+            "0,6,0,6,6,6,6,6,0,0",
+            "0,6,0,0,0,0,0,6,0,0",
+            "0,6,6,6,6,6,6,6,6,0",
+            "0,0,0,0,6,6,0,0,0,0"
         }
     };
 
-    [Header("Corridor Patterns (5x5, base orientation = left corridor)")]
+    [Header("Side Patterns (10x10, base = left side)")]
     [SerializeField] private List<string[]> corridorPatternsCsv = new List<string[]>
     {
         new[]
         {
-            "0,6,6,6,6",
-            "0,0,0,0,6",
-            "0,0,0,0,6",
-            "0,0,0,0,6",
-            "0,6,6,6,6"
+            "0,0,0,0,6,6,0,0,0,0",
+            "0,6,6,6,6,6,6,6,6,0",
+            "0,6,0,0,6,6,0,0,6,0",
+            "0,6,0,6,6,6,6,0,6,0",
+            "0,6,0,6,0,0,6,0,6,6",
+            "0,6,0,6,6,6,6,6,6,6",
+            "0,6,0,0,0,0,6,0,6,0",
+            "0,6,6,6,6,6,6,0,6,0",
+            "0,0,0,0,6,6,0,0,6,0",
+            "0,0,0,0,6,6,0,0,0,0"
         },
         new[]
         {
-            "0,6,6,6,6",
-            "0,6,6,0,6",
-            "0,0,0,0,6",
-            "0,6,6,0,6",
-            "0,6,6,6,6"
+            "0,0,0,0,6,6,0,0,0,0",
+            "0,6,6,6,6,6,6,6,6,0",
+            "0,6,0,0,0,0,0,0,6,0",
+            "0,6,0,6,6,6,6,0,6,0",
+            "0,6,0,6,0,0,6,0,6,6",
+            "0,6,0,6,6,6,6,0,6,6",
+            "0,6,0,0,0,0,6,0,6,0",
+            "0,6,6,6,6,6,6,0,6,0",
+            "0,0,0,0,6,6,0,0,6,0",
+            "0,0,0,0,6,6,0,0,0,0"
         },
         new[]
         {
-            "0,6,6,6,6",
-            "0,0,0,0,6",
-            "0,6,6,6,6",
-            "0,0,0,0,6",
-            "0,6,6,6,6"
+            "0,0,0,0,6,6,0,0,0,0",
+            "0,6,6,0,0,6,6,6,6,0",
+            "0,0,6,0,0,6,0,0,6,0",
+            "0,0,6,6,6,6,0,0,6,0",
+            "0,6,6,0,0,6,6,6,6,6",
+            "0,6,0,0,0,0,0,0,6,6",
+            "0,6,6,6,6,6,6,0,6,0",
+            "0,0,0,0,0,0,6,0,6,0",
+            "0,6,6,6,6,6,6,6,6,0",
+            "0,0,0,0,6,6,0,0,0,0"
         },
         new[]
         {
-            "0,6,6,6,6",
-            "0,0,0,0,6",
-            "0,6,6,6,6",
-            "0,0,0,0,6",
-            "0,6,6,6,6"
+            "0,0,0,0,6,6,0,0,0,0",
+            "0,6,6,6,6,6,0,6,6,0",
+            "0,6,0,0,0,6,0,6,0,0",
+            "0,6,6,6,0,6,6,6,0,0",
+            "0,0,0,6,0,0,0,6,6,6",
+            "0,6,6,6,6,6,0,6,6,6",
+            "0,6,0,0,0,6,0,0,0,0",
+            "0,6,6,6,0,6,6,6,6,0",
+            "0,0,0,6,6,6,0,0,6,0",
+            "0,0,0,0,6,6,0,0,0,0"
         }
     };
 
-    [Header("Center Patterns (5x5, all sides open to connect regions)")]
+    [Header("Center Patterns (10x10, all 4 doors connected)")]
     [SerializeField] private List<string[]> centerPatternsCsv = new List<string[]>
     {
         new[]
         {
-            "0,0,6,0,0",
-            "0,6,6,6,0",
-            "6,6,0,6,6",
-            "0,6,6,6,0",
-            "0,0,6,0,0"
+            "0,0,0,0,6,6,0,0,0,0",
+            "0,6,6,0,6,6,0,6,6,0",
+            "0,6,0,0,6,6,0,0,6,0",
+            "0,6,0,6,6,6,6,0,6,0",
+            "6,6,6,6,0,0,6,6,6,6",
+            "6,6,0,6,6,6,6,0,6,6",
+            "0,6,0,0,0,6,0,0,6,0",
+            "0,6,6,6,6,6,6,6,6,0",
+            "0,0,0,0,6,6,0,0,6,0",
+            "0,0,0,0,6,6,0,0,0,0"
         },
         new[]
         {
-            "0,6,6,6,0",
-            "6,6,0,6,6",
-            "6,0,6,0,6",
-            "6,6,0,6,6",
-            "0,6,6,6,0"
+            "0,0,0,0,6,6,0,0,0,0",
+            "0,6,6,6,6,6,6,6,6,0",
+            "0,6,0,0,0,0,0,0,6,0",
+            "0,6,0,6,6,6,6,0,6,0",
+            "6,6,0,6,0,0,6,0,6,6",
+            "6,6,0,6,6,6,6,0,6,6",
+            "0,6,0,0,0,0,6,0,6,0",
+            "0,6,6,6,6,6,6,0,6,0",
+            "0,0,0,0,6,6,0,0,6,0",
+            "0,0,0,0,6,6,0,0,0,0"
         }
     };
 
+    /*
+    Legacy catalog (5x5)
+
+    Corner patterns:
+    new[]
+    {
+        "0,0,0,0,0",
+        "0,6,6,6,0",
+        "0,6,6,6,0",
+        "0,6,6,6,0",
+        "0,0,0,6,0"
+    }
+    new[]
+    {
+        "0,0,0,0,0",
+        "0,6,6,6,0",
+        "0,6,0,6,0",
+        "0,6,0,6,0",
+        "0,0,0,6,0"
+    }
+    new[]
+    {
+        "0,0,0,0,0",
+        "0,6,6,6,0",
+        "0,6,0,6,0",
+        "0,0,0,6,0",
+        "0,6,6,6,0"
+    }
+    new[]
+    {
+        "0,0,0,0,0",
+        "0,6,6,0,6",
+        "0,6,6,0,6",
+        "0,6,0,0,6",
+        "0,6,6,6,6"
+    }
+
+    Side patterns:
+    new[]
+    {
+        "0,6,6,6,6",
+        "0,0,0,0,6",
+        "0,0,0,0,6",
+        "0,0,0,0,6",
+        "0,6,6,6,6"
+    }
+    new[]
+    {
+        "0,6,6,6,6",
+        "0,6,6,0,6",
+        "0,0,0,0,6",
+        "0,6,6,0,6",
+        "0,6,6,6,6"
+    }
+    new[]
+    {
+        "0,6,6,6,6",
+        "0,0,0,0,6",
+        "0,6,6,6,6",
+        "0,0,0,0,6",
+        "0,6,6,6,6"
+    }
+    new[]
+    {
+        "0,6,6,6,6",
+        "0,0,0,0,6",
+        "0,6,6,6,6",
+        "0,0,0,0,6",
+        "0,6,6,6,6"
+    }
+
+    Center patterns:
+    new[]
+    {
+        "0,0,6,0,0",
+        "0,6,6,6,0",
+        "6,6,0,6,6",
+        "0,6,6,6,0",
+        "0,0,6,0,0"
+    }
+    new[]
+    {
+        "0,6,6,6,0",
+        "6,6,0,6,6",
+        "6,0,6,0,6",
+        "6,6,0,6,6",
+        "0,6,6,6,0"
+    }
+    */
+
     public int WallCode => wallCode;
     public int FloorCode => floorCode;
+    public int TargetRegionSize => targetRegionSize;
 
     public List<int[,]> GetRandomCornerSet(int count)
     {
@@ -120,10 +261,10 @@ public class RegionPatternLibrary : MonoBehaviour
     {
         if (centerPatternsCsv == null || centerPatternsCsv.Count == 0)
         {
-            return CreateFilled(5, 5, floorCode);
+            return CreateFilled(targetRegionSize, targetRegionSize, floorCode);
         }
 
-        int index = UnityEngine.Random.Range(0, centerPatternsCsv.Count);
+        int index = Random.Range(0, centerPatternsCsv.Count);
         return ParseCsvBlock(centerPatternsCsv[index]);
     }
 
@@ -151,7 +292,7 @@ public class RegionPatternLibrary : MonoBehaviour
                 }
             }
 
-            int pickBagIndex = UnityEngine.Random.Range(0, bag.Count);
+            int pickBagIndex = Random.Range(0, bag.Count);
             int selected = bag[pickBagIndex];
             bag.RemoveAt(pickBagIndex);
 
@@ -165,20 +306,26 @@ public class RegionPatternLibrary : MonoBehaviour
     {
         if (rows == null || rows.Length == 0)
         {
-            return CreateFilled(5, 5, floorCode);
+            return CreateFilled(targetRegionSize, targetRegionSize, floorCode);
         }
 
         int height = rows.Length;
         string[] first = rows[0].Split(',');
         int width = first.Length;
-        int[,] matrix = new int[height, width];
 
+        if (height != targetRegionSize || width != targetRegionSize)
+        {
+            Debug.LogWarning("RegionPatternLibrary: pattern size mismatch, expected " + targetRegionSize + "x" + targetRegionSize + ".");
+            return CreateFilled(targetRegionSize, targetRegionSize, wallCode);
+        }
+
+        int[,] matrix = new int[height, width];
         for (int y = 0; y < height; y++)
         {
             string[] cols = rows[y].Split(',');
             for (int x = 0; x < width; x++)
             {
-                int value = floorCode;
+                int value = wallCode;
                 if (x < cols.Length)
                 {
                     int.TryParse(cols[x].Trim(), out value);

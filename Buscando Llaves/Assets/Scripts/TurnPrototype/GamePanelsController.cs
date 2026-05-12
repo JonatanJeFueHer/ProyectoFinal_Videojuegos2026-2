@@ -6,6 +6,7 @@ public class GamePanelsController : MonoBehaviour
     [Header("References")]
     [SerializeField] private SimpleTurnManager turnManager;
     [SerializeField] private SimpleGameStateManager gameStateManager;
+    [SerializeField] private SoundManager soundManager;
 
     [Header("Panels")]
     [SerializeField] private GameObject startPanel;
@@ -31,6 +32,11 @@ public class GamePanelsController : MonoBehaviour
         if (gameStateManager == null)
         {
             gameStateManager = FindObjectOfType<SimpleGameStateManager>();
+        }
+
+        if (soundManager == null)
+        {
+            soundManager = SoundManager.Instance;
         }
     }
 
@@ -117,6 +123,7 @@ public class GamePanelsController : MonoBehaviour
         }
 
         Time.timeScale = 1f;
+        soundManager?.SetMusicPaused(false);
 
         if (turnManager != null)
         {
@@ -150,6 +157,7 @@ public class GamePanelsController : MonoBehaviour
         }
 
         Time.timeScale = 0f;
+        soundManager?.SetMusicPaused(true);
 
         if (turnManager != null)
         {
@@ -167,6 +175,7 @@ public class GamePanelsController : MonoBehaviour
         }
 
         Time.timeScale = 1f;
+        soundManager?.SetMusicPaused(false);
 
         if (turnManager != null)
         {

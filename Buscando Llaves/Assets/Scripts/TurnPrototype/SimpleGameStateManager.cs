@@ -12,6 +12,7 @@ public class SimpleGameStateManager : MonoBehaviour
     [SerializeField] private SimpleTurnManager turnManager;
     [SerializeField] private SimpleGridMapGenerator mapGenerator;
     [SerializeField] private SimpleGridTurnMovement gridMovement;
+    [SerializeField] private SoundManager soundManager;
 
     [Header("UI")]
     [SerializeField] private TMP_Text diceResultText;
@@ -58,6 +59,11 @@ public class SimpleGameStateManager : MonoBehaviour
         if (gridMovement == null)
         {
             gridMovement = FindObjectOfType<SimpleGridTurnMovement>();
+        }
+
+        if (soundManager == null)
+        {
+            soundManager = SoundManager.Instance;
         }
     }
 
@@ -164,6 +170,7 @@ public class SimpleGameStateManager : MonoBehaviour
             numericHand.Add(numericValue);
             UpdateHandUI();
             SetStatus($"Carta numerica obtenida: {card}");
+            soundManager?.PlayNumericCard();
             return;
         }
 
@@ -280,6 +287,7 @@ public class SimpleGameStateManager : MonoBehaviour
         {
             int availableTotal = GetHandTotal();
             SetStatus($"Cofre {chestName} en ({gridPosition.x},{gridPosition.y}) costo {cost}. No alcanza. Total disponible: {availableTotal}.");
+            soundManager?.PlayChestOpenFail();
             return false;
         }
 
@@ -287,6 +295,7 @@ public class SimpleGameStateManager : MonoBehaviour
 
         string cardsText = usedCards.Count > 0 ? string.Join(", ", usedCards) : "ninguna";
         SetStatus($"Cofre {chestName} abierto en ({gridPosition.x},{gridPosition.y}) usando {cardsText} (total {usedTotal}).");
+        soundManager?.PlayChestOpen();
 
         if (fromMap && mapGenerator != null)
         {
@@ -363,14 +372,17 @@ public class SimpleGameStateManager : MonoBehaviour
         switch (card)
         {
             case "Tristeza":
+                soundManager?.PlayTristezaCard();
                 ChangeLives(-1, "Carta rara Tristeza: pierdes 1 vida.");
                 break;
 
             case "Retorno":
+                soundManager?.PlayRetornoCard();
                 SetStatus("Carta rara Retorno: efecto registrado. El retroceso queda pendiente para una version avanzada.");
                 break;
 
             case "Stop":
+                soundManager?.PlayStopCard();
                 if (turnManager != null)
                 {
                     turnManager.BlockNextTurnMovements();
@@ -400,6 +412,7 @@ public class SimpleGameStateManager : MonoBehaviour
         keysFound++;
         UpdateKeysUI();
         SetStatus(message);
+        soundManager?.PlayKeyFound();
 
         if (keysFound >= keysToWin)
         {
@@ -417,6 +430,10 @@ public class SimpleGameStateManager : MonoBehaviour
 
         UpdateLivesUI();
         SetStatus(message);
+        if (delta < 0)
+        {
+            soundManager?.PlayLoseLife();
+        }
 
         if (currentLives <= 0)
         {
@@ -440,6 +457,14 @@ public class SimpleGameStateManager : MonoBehaviour
         }
 
         SetStatus(message);
+        if (isVictory)
+        {
+            soundManager?.PlayVictory();
+        }
+        else
+        {
+            soundManager?.PlayDefeat();
+        }
         OnGameEnded?.Invoke(isVictory, message);
     }
 

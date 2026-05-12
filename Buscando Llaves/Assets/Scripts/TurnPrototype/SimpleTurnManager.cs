@@ -100,6 +100,7 @@ public class SimpleTurnManager : MonoBehaviour
         }
 
         int diceResult = UnityEngine.Random.Range(1, 7);
+        SoundManager.Instance?.PlayDiceRoll();
         movementsRemaining = diceResult;
         waitingForDice = false;
         waitingForCard = false;

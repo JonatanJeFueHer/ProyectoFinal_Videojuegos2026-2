@@ -11,6 +11,7 @@ public class SimpleGridTurnMovement : MonoBehaviour
     [SerializeField] private float playerHeightOffset = 1f;
 
     private Vector2Int currentGridPosition;
+    private SoundManager soundManager;
 
     public Vector2Int CurrentGridPosition => currentGridPosition;
 
@@ -35,6 +36,8 @@ public class SimpleGridTurnMovement : MonoBehaviour
         {
             turnManager.SetUseExternalMovementInput(true);
         }
+
+        soundManager = SoundManager.Instance;
     }
 
     private void Start()
@@ -97,6 +100,12 @@ public class SimpleGridTurnMovement : MonoBehaviour
         if (!mapGenerator.IsWalkable(nextGridPosition))
         {
             Debug.Log($"Movimiento bloqueado hacia {nextGridPosition}. No hay casilla disponible.");
+            if (soundManager == null)
+            {
+                soundManager = SoundManager.Instance;
+            }
+
+            soundManager?.PlayMoveDenied();
             return;
         }
 
@@ -116,6 +125,12 @@ public class SimpleGridTurnMovement : MonoBehaviour
         currentGridPosition = nextGridPosition;
         playerTransform.position = nextWorldPosition + Vector3.up * playerHeightOffset;
         Debug.Log($"Jugador movido a casilla {currentGridPosition.x},{currentGridPosition.y}");
+        if (soundManager == null)
+        {
+            soundManager = SoundManager.Instance;
+        }
+
+        soundManager?.PlayFootstep();
         turnManager.CompleteExternalMovementStep();
     }
 }
